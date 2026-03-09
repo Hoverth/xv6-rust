@@ -1,3 +1,4 @@
 fs.img
 *.S
 qemu*
+xv6-mkfs/mkfs
