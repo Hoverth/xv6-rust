@@ -1,2 +1,3 @@
 fs.img
 *.S
+qemu*
