@@ -74,6 +74,7 @@ fn load_seg(
     size: usize
 ) -> Result<(), &'static str> {
     // 生成虚拟地址
+    // Create virtual address
     let mut va = VirtualAddress::new(va);
     if !va.is_page_aligned() {
         panic!("load_seg(): va must be page aligned.");
@@ -85,6 +86,7 @@ fn load_seg(
                 .pgt_translate(va) {
             Some(pa) => {
                 // 将用户虚拟地址翻译成物理地址
+                // Translating a user's virtual address into a physical address
                 let count: usize;
                 if size - copy_size < PGSIZE {
                     count = size - copy_size;
@@ -151,7 +153,7 @@ pub unsafe fn exec(
 
     // println!("[Debug] 检查魔数");
     if elf.magic != ELF_MAGIC {
-        // println!("[Debug] 魔数错误, 为0x{:x}, 应为0x{:x}", elf.magic, ELF_MAGIC);
+        // println!("[Debug] Bad magic number - 魔数错误, was - 为0x{:x}, expected - 应为0x{:x}", elf.magic, ELF_MAGIC);
         drop(inode_guard);
         LOG.end_op();
         return Err("exec: Elf magic number is wrong.")
@@ -211,7 +213,7 @@ pub unsafe fn exec(
                 }
 
                 // load segement information
-                // println!("[Debug] 偏移量: 0x{:x}, 文件大小: 0x{:x}", ph.off, ph.file_size);
+                // println!("[Debug] Segment - 偏移量: 0x{:x}, Size - 文件大小: 0x{:x}", ph.off, ph.file_size);
                 if load_seg(
                     &mut page_table, 
                     ph.vaddr, 
@@ -234,7 +236,7 @@ pub unsafe fn exec(
             }
             off += size_of::<ProgHeader>();
         }
-        // println!("[Debug] 完成加载程序");
+        // println!("[Debug] Completing loading program - 完成加载程序");
 
         drop(inode_guard);
         LOG.end_op();

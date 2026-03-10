@@ -41,7 +41,7 @@ impl InodeCache {
     }
 
 
-    /// Clone an inode by just increment its reference count by 1. 
+    /// Clone an inode by just increment its reference count by 1.
     fn dup(&self, inode: &Inode) -> Inode {
         let mut guard = self.meta.acquire();
         guard[inode.index].refs += 1;
@@ -52,17 +52,17 @@ impl InodeCache {
         }
     }
 
-    /// Done with this inode. 
-    /// If this is the last reference in the inode cache, then is might be recycled. 
-    /// Further, if this inode has no links anymore, free this inode in the disk. 
-    /// It should only be called by the Drop impl of Inode. 
+    /// Done with this inode.
+    /// If this is the last reference in the inode cache, then is might be recycled.
+    /// Further, if this inode has no links anymore, free this inode in the disk.
+    /// It should only be called by the Drop impl of Inode.
     fn put(&self, inode: &mut Inode) {
         let mut guard = self.meta.acquire();
         let i = inode.index;
         let imeta = &mut guard[i];
 
         if imeta.refs == 1 {
-            // SAFETY: reference count is 1, so this lock will not block. 
+            // SAFETY: reference count is 1, so this lock will not block.
             let mut idata = self.data[i].lock();
             if !idata.valid || idata.dinode.nlink > 0 {
                 idata.valid = false;
@@ -76,10 +76,10 @@ impl InodeCache {
                 idata.valid = false;
                 drop(idata);
 
-                // recycle after this inode content in the cache is no longer valid. 
-                // note: it is wrong to recycle it earlier, 
+                // recycle after this inode content in the cache is no longer valid.
+                // note: it is wrong to recycle it earlier,
                 // otherwise the cache content might change
-                // before the previous content written to disk. 
+                // before the previous content written to disk.
                 let mut guard = self.meta.acquire();
                 guard[i].refs -= 1;
                 debug_assert_eq!(guard[i].refs, 0);
@@ -91,9 +91,9 @@ impl InodeCache {
         }
     }
 
-    /// Allocate an inode on device dev. 
-    /// Mark it as allocated by giving it type type. 
-    /// Returns an unlocked but allocated and reference inode 
+    /// Allocate an inode on device dev.
+    /// Mark it as allocated by giving it type type.
+    /// Returns an unlocked but allocated and reference inode
     pub fn alloc(&self, dev: u32, itype: InodeType) -> Option<Inode> {
         let ninodes = unsafe {
             SUPER_BLOCK.ninodes()
@@ -105,7 +105,7 @@ impl InodeCache {
             };
             // read block into buffer by device and block_id
             let mut block = BCACHE.bread(dev, block_id);
-        
+
             // Get inode offset in the block
             let offset = locate_inode_offset(inum) as isize;
             let dinode = unsafe { (block.raw_data_mut() as *mut DiskInode).offset(offset) };
@@ -120,19 +120,20 @@ impl InodeCache {
         None
     }
 
-    /// Lookup the inode in the inode cache. 
-    /// If found, return an handle. 
-    /// If not found, alloc an in-memory location in the cache, 
-    /// but not fetch it from the disk yet. 
+    /// Lookup the inode in the inode cache.
+    /// If found, return an handle.
+    /// If not found, alloc an in-memory location in the cache,
+    /// but not fetch it from the disk yet.
     fn get(&self, dev: u32, inum: u32) -> Inode {
         let mut guard = self.meta.acquire();
 
-        // lookup in the cache 
+        // lookup in the cache
         let mut empty_i: Option<usize> = None;
         for i in 0..NINODE {
             if guard[i].inum == inum && guard[i].refs > 0 && guard[i].dev == dev {
                 guard[i].refs += 1;
                 // println!("[Debug] 获取Inode");
+                // println!("[Debug] Accessed Inode");
                 return Inode {
                     dev,
                     inum,
@@ -144,7 +145,7 @@ impl InodeCache {
             }
         }
 
-        // not found 
+        // not found
         let empty_i = match empty_i {
             Some(i) => i,
             None => panic!("inode: not enough"),
@@ -153,6 +154,7 @@ impl InodeCache {
         guard[empty_i].inum = inum;
         guard[empty_i].refs = 1;
         // 此时 Inode Cache 应当是无效的
+        // Inode Cache is not valid.
         let idata = self.data[empty_i].lock();
         assert!(idata.valid == false, "此时 idata 应当无效");
         Inode {
@@ -164,9 +166,9 @@ impl InodeCache {
 
     /// Helper function for 'namei' and 'namei_parent'
     fn namex(
-        &self, 
-        path: &[u8], 
-        name: &mut [u8;DIRSIZ], 
+        &self,
+        path: &[u8],
+        name: &mut [u8;DIRSIZ],
         is_parent: bool
     ) -> Option<Inode> {
         let mut inode: Inode;
@@ -204,25 +206,25 @@ impl InodeCache {
             }
         }
         if is_parent {
-            // only when querying root inode's parent 
+            // only when querying root inode's parent
             println!("[Kernel] Warning: namex querying root inode's parent");
-            None 
+            None
         } else {
             Some(inode)
         }
     }
 
-    /// namei interprets the path argument as an pathname to Unix file. 
-    /// It will return an [`inode`] if succeed, Err(()) if fail. 
+    /// namei interprets the path argument as an pathname to Unix file.
+    /// It will return an [`inode`] if succeed, Err(()) if fail.
     /// It must be called inside a transaction(i.e.,'begin_op' and `end_op`) since it calls `put`.
-    /// Note: the path should end with 0u8, otherwise it might panic due to out-of-bound. 
+    /// Note: the path should end with 0u8, otherwise it might panic due to out-of-bound.
     pub fn namei(&self, path: &[u8]) -> Option<Inode> {
         let mut name: [u8;DIRSIZ] = [0;DIRSIZ];
         self.namex(path, &mut name, false)
     }
 
-    /// Same behavior as `namei`, but return the parent of the inode, 
-    /// and copy the end path into name. 
+    /// Same behavior as `namei`, but return the parent of the inode,
+    /// and copy the end path into name.
     pub fn namei_parent(&self, path: &[u8], name: &mut [u8;DIRSIZ]) -> Option<Inode> {
         self.namex(path, name, true)
     }
@@ -238,7 +240,7 @@ impl InodeCache {
         let mut name: [u8; DIRSIZ] = [0; DIRSIZ];
         let dirinode = self.namei_parent(path, &mut name).unwrap();
         let mut dirinode_guard = dirinode.lock();
-        
+
         match dirinode_guard.dir_lookup(&name) {
             Some(inode) => {
                 drop(dirinode_guard);
@@ -251,20 +253,20 @@ impl InodeCache {
                         }
                         return Err("create: unmatched type.");
                     },
-    
+
                     _ => {
                         return Err("create: unmatched type.")
                     }
                 }
             },
-    
+
             None => {}
         }
         // Allocate a new inode to create file
         let dev = dirinode_guard.dev;
         let inum = inode_alloc(dev, itype);
         let inode = self.get(dev, inum);
-        
+
         let mut inode_guard = inode.lock();
         // initialize new allocated inode
         inode_guard.dinode.major = major;
@@ -273,13 +275,13 @@ impl InodeCache {
         // Write back to disk
         inode_guard.update();
         debug_assert_eq!(inode_guard.dinode.itype, itype);
-    
-        // Directory, create .. 
+
+        // Directory, create ..
         if itype == InodeType::Directory {
-            // Create . and .. entries. 
+            // Create . and .. entries.
             inode_guard.dinode.nlink += 1;
             inode_guard.update();
-            // No nlink++ for . to avoid recycle ref count. 
+            // No nlink++ for . to avoid recycle ref count.
             inode_guard.dir_link(".".as_bytes(), inode.inum)?;
             inode_guard.dir_link("..".as_bytes(), dirinode_guard.inum)?;
         }
@@ -293,12 +295,12 @@ impl InodeCache {
     }
 }
 
-/// Skip the path starting at cur by b'/'s. 
-/// It will copy the skipped content to name. 
-/// Return the current offset after skiping. 
+/// Skip the path starting at cur by b'/'s.
+/// It will copy the skipped content to name.
+/// Return the current offset after skiping.
 fn skip_path(
-    path: &[u8], 
-    mut cur: usize, 
+    path: &[u8],
+    mut cur: usize,
     name: &mut [u8; DIRSIZ]
 ) -> usize {
     // skip preceding b'/'
@@ -314,7 +316,7 @@ fn skip_path(
         cur += 1;
     }
 
-    let mut count = cur - start; 
+    let mut count = cur - start;
     if count >= name.len() {
         debug_assert!(false);
         count = name.len() - 1;
@@ -382,7 +384,7 @@ impl InodeData {
         stat.size = self.dinode.size as usize;
     }
 
-    /// Discard the inode data/content. 
+    /// Discard the inode data/content.
     pub fn truncate(&mut self, inode: &Inode) {
         // direct block
         for i in 0..NDIRECT {
@@ -411,11 +413,11 @@ impl InodeData {
         self.update();
     }
 
-    /// Update a modified in-memory inode to disk. 
-    /// Typically called after changing the content of inode info. 
+    /// Update a modified in-memory inode to disk.
+    /// Typically called after changing the content of inode info.
     pub fn update(&mut self) {
         let mut buf = BCACHE.bread(
-            self.dev, 
+            self.dev,
             unsafe { SUPER_BLOCK.locate_inode(self.inum)}
         );
         let offset = locate_inode_offset(self.inum) as isize;
@@ -427,11 +429,11 @@ impl InodeData {
 
     /// The content (data) associated with each inode is stored
     /// in blocks on the disk. The first NDIRECT block numbers
-    /// are listed in self.dinode.addrs, The next NINDIRECT blocks are 
-    /// listed in block self.dinode.addrs[NDIRECT]. 
-    /// 
-    /// Return the disk block address of the nth block in inode. 
-    /// If there is no such block, bmap allocates one. 
+    /// are listed in self.dinode.addrs, The next NINDIRECT blocks are
+    /// listed in block self.dinode.addrs[NDIRECT].
+    ///
+    /// Return the disk block address of the nth block in inode.
+    /// If there is no such block, bmap allocates one.
     pub fn bmap(&mut self, offset_bn: u32) -> Result<u32, &'static str> {
         let mut addr;
         let offset_bn = offset_bn as usize;
@@ -445,7 +447,7 @@ impl InodeData {
             }
         }
         if offset_bn < NINDIRECT + NDIRECT {
-            // Load indirect block, allocating if necessary. 
+            // Load indirect block, allocating if necessary.
             let count = offset_bn - NDIRECT;
             if self.dinode.addrs[NDIRECT] == 0 {
                 addr = balloc(self.dev);
@@ -469,18 +471,18 @@ impl InodeData {
         panic!("inode bmap: out of range.");
     }
 
-    /// Read data from inode. 
-    /// Caller must hold inode's sleeplock. 
+    /// Read data from inode.
+    /// Caller must hold inode's sleeplock.
     /// If is_user is true, then dst is a user virtual address;
-    /// otherwise, dst is a kernel address. 
+    /// otherwise, dst is a kernel address.
     /// is_user 为 true 表示 dst 为用户虚拟地址，否则表示内核虚拟地址
     pub fn read(
-        &mut self, 
-        is_user: bool, 
-        mut dst: usize, 
-        offset: u32, 
+        &mut self,
+        is_user: bool,
+        mut dst: usize,
+        offset: u32,
         count: u32
-    ) -> Result<usize, &'static str> { 
+    ) -> Result<usize, &'static str> {
         // Check the reading content is in range.
         let end = offset.checked_add(count).ok_or("Fail to add count.")?;
         if end > self.dinode.size {
@@ -499,8 +501,8 @@ impl InodeData {
             let buf = BCACHE.bread(self.dev, block_no);
             let write_len = min(surplus_len, BSIZE - block_offset);
             if copy_from_kernel(
-                is_user, 
-                dst, 
+                is_user,
+                dst,
                 unsafe{ (buf.raw_data() as *mut u8).offset((offset % BSIZE) as isize) },
                 write_len as usize
             ).is_err() {
@@ -512,6 +514,7 @@ impl InodeData {
             offset += write_len as usize;
             dst += write_len as usize;
             // 块的初始值及块的偏移量
+            // The initial value of the block and the offset of the block
             block_basic = offset / BSIZE;
             block_offset = offset % BSIZE;
         }
@@ -519,18 +522,18 @@ impl InodeData {
     }
 
 
-    /// Write data to inode. 
-    /// Caller must hold inode's sleeplock. 
-    /// If is_user is true, then src is a user virtual address; 
-    /// otherwise, src is a kernel address. 
-    /// Returns the number of bytes successfully written. 
-    /// If the return value is less than the requestes n, 
-    /// there was an error of some kind. 
+    /// Write data to inode.
+    /// Caller must hold inode's sleeplock.
+    /// If is_user is true, then src is a user virtual address;
+    /// otherwise, src is a kernel address.
+    /// Returns the number of bytes successfully written.
+    /// If the return value is less than the requestes n,
+    /// there was an error of some kind.
     pub fn write(
-        &mut self, 
-        is_user: bool, 
-        mut src: usize, 
-        offset: u32, 
+        &mut self,
+        is_user: bool,
+        mut src: usize,
+        offset: u32,
         count: u32
     ) -> Result<usize, &'static str> {
         // let end = offset.checked_add(count).ok_or("Fail to add count.")?;
@@ -550,9 +553,9 @@ impl InodeData {
             let mut buf = BCACHE.bread(self.dev, block_no);
             let write_len = min(surplus_len, BSIZE - block_offset);
             if copy_to_kernel(
-                unsafe{ (buf.raw_data_mut() as *mut u8).offset((offset % BSIZE) as isize ) }, 
-                is_user, 
-                src, 
+                unsafe{ (buf.raw_data_mut() as *mut u8).offset((offset % BSIZE) as isize ) },
+                is_user,
+                src,
                 write_len
             ).is_err() {
                 drop(buf);
@@ -575,13 +578,13 @@ impl InodeData {
         }
 
         self.update();
-        
+
         // println!("[Kernel] Write end");
         Ok(total)
     }
 
-    /// Look for an inode entry in this directory according the name. 
-    /// Panics if this is not a directory. 
+    /// Look for an inode entry in this directory according the name.
+    /// Panics if this is not a directory.
     pub fn dir_lookup(&mut self, name: &[u8]) -> Option<Inode> {
         // assert!(name.len() == DIRSIZ);
         if self.dinode.itype != InodeType::Directory {
@@ -592,9 +595,9 @@ impl InodeData {
         let dir_entry_ptr = &mut dir_entry as *mut _ as *mut u8;
         for offset in (0..self.dinode.size).step_by(de_size) {
             self.read(
-                false, 
-                dir_entry_ptr as usize, 
-                offset, 
+                false,
+                dir_entry_ptr as usize,
+                offset,
                 de_size as u32
             ).expect("Cannot read entry in this dir");
             if dir_entry.inum == 0 {
@@ -623,9 +626,9 @@ impl InodeData {
         let mut entry_offset = 0;
         for offset in (0..self.dinode.size).step_by(size_of::<DirEntry>()) {
             self.read(
-                false, 
-                (&mut dir_entry) as *mut DirEntry as usize, 
-                offset, 
+                false,
+                (&mut dir_entry) as *mut DirEntry as usize,
+                offset,
                 size_of::<DirEntry>() as u32
             )?;
             entry_offset += size_of::<DirEntry>() as u32;
@@ -638,12 +641,12 @@ impl InodeData {
         }
         dir_entry.inum = inum as u16;
         self.write(
-            false, 
-            (&dir_entry) as *const _ as usize, 
-            entry_offset, 
+            false,
+            (&dir_entry) as *const _ as usize,
+            entry_offset,
             size_of::<DirEntry>() as u32
         )?;
-        
+
         Ok(())
     }
 
@@ -654,11 +657,11 @@ impl InodeData {
         let init_size = 2 * size_of::<DirEntry>() as u32;
         let final_size = self.dinode.size;
         for offset in (init_size..final_size).step_by(size_of::<DirEntry>()) {
-            // Check each direntry, foreach step by size of DirEntry. 
+            // Check each direntry, foreach step by size of DirEntry.
             if self.read(
-                false, 
-                &mut dir_entry as *mut DirEntry as usize, 
-                offset, 
+                false,
+                &mut dir_entry as *mut DirEntry as usize,
+                offset,
                 size_of::<DirEntry>() as u32
             ).is_err() {
                 panic!("is_dir_empty(): Fail to read dir content");
@@ -673,8 +676,8 @@ impl InodeData {
     }
 }
 
-/// Inode handed out by inode cache. 
-/// It is actually a handle pointing to the cache. 
+/// Inode handed out by inode cache.
+/// It is actually a handle pointing to the cache.
 #[derive(Debug)]
 pub struct Inode {
     pub dev: u32,
@@ -689,13 +692,13 @@ impl Clone for Inode {
 }
 
 impl Inode {
-    /// Lock the inode. 
-    /// Load it from the disk if its content not cached yet. 
+    /// Lock the inode.
+    /// Load it from the disk if its content not cached yet.
     pub fn lock<'a>(&'a self) -> SleepLockGuard<'a, InodeData> {
         assert!(self.index < NINODE, "index must less than NINODE");
         // println!("[Kernel] inode.lock(): inode index: {}, dev: {}, inum: {}", self.index, self.dev, self.inum);
         let mut guard = ICACHE.data[self.index].lock();
-        
+
         if !guard.valid {
             let blockno = unsafe{ SUPER_BLOCK.locate_inode(self.inum) };
             let buf = BCACHE.bread(self.dev, blockno);
@@ -715,17 +718,17 @@ impl Inode {
 }
 
 impl Drop for Inode {
-    /// Done with this inode. 
-    /// If this is the last reference in the inode cache, then is might be recycled. 
-    /// Further, if this inode has no links anymore, free this inode in the disk. 
+    /// Done with this inode.
+    /// If this is the last reference in the inode cache, then is might be recycled.
+    /// Further, if this inode has no links anymore, free this inode in the disk.
     fn drop(&mut self) {
         ICACHE.put(self)
     }
 }
 
 
-/// Given an inode number. 
-/// Calculate the offset index of this inode inside the block. 
+/// Given an inode number.
+/// Calculate the offset index of this inode inside the block.
 #[inline]
 fn locate_inode_offset(inum: u32) -> usize {
     inum as usize % IPB

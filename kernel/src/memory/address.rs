@@ -10,6 +10,7 @@ use crate::arch::riscv::qemu::layout::{
 
 /// 统一地址,分为用户物理地址，内核物理地址
 /// 用户虚拟地址，内核虚拟地址
+/// Unified address, divided into user physical address, kernel physical address, User virtual address, kernel virtual address
 pub enum UnifiedAddress {
     UserPhysical(PhysicalAddress),
     KernelPhysical(PhysicalAddress),

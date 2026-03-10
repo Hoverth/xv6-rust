@@ -68,6 +68,7 @@ static mut TIMER_SCRATCH:[[u64; 5]; NCPU] = [[0u64; 5]; NCPU];
 static STARTED:AtomicBool = AtomicBool::new(false);
 
 /// 引导启动程序,进行寄存器的初始化操作
+/// Boot the starter for the initialization operation of the register
 #[no_mangle]
 pub unsafe fn start() -> !{
     // Set M Previlege mode to Supervisor, for mret
@@ -141,6 +142,7 @@ unsafe fn timer_init(){
 }
 
 /// 进入内核初始化
+/// Start kernel initialisation
 #[no_mangle]
 pub unsafe extern "C" fn rust_main() {
     if cpu::cpuid() == 0 {

@@ -26,6 +26,7 @@ impl Syscall<'_> {
         let pdata = unsafe{ &mut *self.process.data.get() };
         let file = pdata.open_files[old_fd].as_ref().unwrap();
         // 使用 Arc 来代替 refs
+        // TODO: Use Arc instead of refs
         let new_fd = unsafe{ CPU_MANAGER.alloc_fd(&file) }.unwrap();
         let new_file = Arc::clone(&file);
         pdata.open_files[new_fd].replace(new_file);
@@ -40,6 +41,7 @@ impl Syscall<'_> {
         let pdata = unsafe{ &mut *self.process.data.get() };
         let file = pdata.open_files[fd].as_ref().unwrap();
         // 两个参数分别是读取存储的地址和读取的最大字节数
+        // The two parameters are the address of the read storage and the maximum number of bytes read.
         // Get user read address
         let ptr = self.arg(1);
         // Get read size
@@ -266,6 +268,7 @@ impl Syscall<'_> {
         let fd = self.arg(0);
         let pdata = unsafe{ &mut *self.process.data.get() };
         // 使用 take() 夺取所有权来将引用数减 1
+        // Use take() to take ownership to reduce the number of references by 1
         pdata.open_files[fd].take();
         Ok(0)
     }

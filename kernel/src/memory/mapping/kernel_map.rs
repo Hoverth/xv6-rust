@@ -122,6 +122,7 @@ unsafe fn kernel_map() {
     );
 
     // 映射不同进程的内核栈
+    // Mapping the kernel stacks of different processes
     PROC_MANAGER.proc_mapstacks();
 }
 

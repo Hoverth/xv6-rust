@@ -101,8 +101,10 @@ impl Syscall<'_> {
     pub fn syscall(&mut self) -> SysResult {
         let pdata = self.process.data.get_mut();
         // 获取进程的trapframe
+        // Get the process trapframe
         let tf = unsafe{ &mut *pdata.trapframe };
         // 获取系统调用 id 号
+        // Get the syscall id number
         let sys_id = SysCallID::new(tf.a7);
         
         match sys_id {
@@ -129,6 +131,7 @@ impl Syscall<'_> {
     }
 
     /// 获取第n个位置的参数
+    /// Get the parameters for the nth position
     pub fn arg(&self, id: usize) -> usize {
         let pdata = unsafe{ &mut* self.process.data.get() };
         let tf = unsafe{ &*pdata.trapframe };
@@ -139,11 +142,12 @@ impl Syscall<'_> {
             3 => tf.a3,
             4 => tf.a4,
             5 => tf.a5,
-            _ => panic!("不能获取参数")
+            _ => panic!("Unable to obtain parameters - 不能获取参数")
         }
     }
 
     /// 通过地址获取str并将其填入到缓冲区中
+    /// Use address to get str and fill it into the buffer
     pub fn copy_from_str(&self, addr: usize, buf: &mut [u8], max_len: usize) -> Result<(), ()> {
         let pdata = unsafe{ &mut *self.process.data.get() };
         let pgt = pdata.pagetable.as_mut().unwrap();
@@ -160,7 +164,7 @@ impl Syscall<'_> {
         if addr > pdata.size || addr + size_of::<usize>() > pdata.size {
             println!("[Debug] addr: 0x{:x}", addr);
             println!("[Debug] pdata size: 0x{:x}", pdata.size);
-            panic!("拷贝的地址值超出了进程")
+            panic!("The address value of the copy exceeds the process. - 拷贝的地址值超出了进程")
         }
     
         let pgt = pdata.pagetable.as_mut().unwrap();

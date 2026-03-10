@@ -37,16 +37,16 @@ impl ProcManager{
             wait_lock: Spinlock::new((), "wait_lock"),
         }
     }
-    
+
     pub fn get_table_mut(&mut self) -> &mut [Process; NPROC] {
         &mut self.proc
     }
 
     pub fn alloc_pid(&mut self) -> usize {
         let mut guard = self.pid_lock.acquire();
-        let pid;       
+        let pid;
         *guard += 1;
-        pid = *guard;        
+        pid = *guard;
         drop(guard);
         pid
     }
@@ -61,22 +61,22 @@ impl ProcManager{
     }
 
     /// Allocate 4 page for each process's kernel stack.
-    /// Map it high in memory, followed by an invalid 
+    /// Map it high in memory, followed by an invalid
     /// group page
     pub unsafe fn proc_mapstacks(&mut self) {
         for (pos, _) in self.proc.iter_mut().enumerate() {
             let pa = Stack::new_zeroed();
             let va = kernel_stack(pos);
 
-            // map process stack into kernel, 
-            // which contain 5 page(stack for 4 page and 1 for guard page). 
+            // map process stack into kernel,
+            // which contain 5 page(stack for 4 page and 1 for guard page).
             KERNEL_PAGETABLE.kernel_map(
                 VirtualAddress::new(va),
                 PhysicalAddress::new(pa),
                 PGSIZE * 4,
                 PteFlags::R | PteFlags::W
             );
-            
+
         }
     }
 
@@ -94,7 +94,7 @@ impl ProcManager{
 
         pdata.size = PGSIZE;
 
-        // prepare for the very first "return" from kernel to user. 
+        // prepare for the very first "return" from kernel to user.
         let tf =  &mut *pdata.trapframe;
         tf.epc = 0; // user program counter
         tf.sp = 4 * PGSIZE; // user stack pointer
@@ -103,7 +103,7 @@ impl ProcManager{
         pdata.set_name(init_name);
         // Set init process's directory
         pdata.cwd = Some(ICACHE.namei(&ROOTIPATH).expect("cannot find root inode"));
-        
+
         let mut guard = p.meta.acquire();
         guard.set_state(ProcState::RUNNABLE);
         drop(guard);
@@ -116,7 +116,7 @@ impl ProcManager{
     /// Look in the process table for an UNUSED proc.
     /// If found, initialize state required to run in the kernel,
     /// and return p.acquire() held.
-    /// If there are a free procs, or a memory allocation fails, return 0. 
+    /// If there are a free procs, or a memory allocation fails, return 0.
 
     /// WARNING: possible error occurs here.
     pub fn alloc_proc(&mut self) -> Option<&mut Process> {
@@ -136,8 +136,8 @@ impl ProcManager{
                     unsafe{
                         pdata.proc_pagetable();
                     }
-                    // Set up new context to start executing at forkret, 
-                    // which returns to user space. 
+                    // Set up new context to start executing at forkret,
+                    // which returns to user space.
                     pdata.init_context();
                     drop(pmeta);
                     return Some(proc)
@@ -180,8 +180,8 @@ impl ProcManager{
         None
     }
 
-    /// Pass p's abandonded children to init. 
-    /// Caller must hold wait lock. 
+    /// Pass p's abandonded children to init.
+    /// Caller must hold wait lock.
     pub fn reparent(&self, proc: &mut Process) {
         for index in 0..self.proc.len() {
             let p = &self.proc[index];
@@ -194,18 +194,19 @@ impl ProcManager{
                 }
         }
     }
-    
-    /// Exit the current process. Does not return. 
-    /// An exited process remains in the zombie state 
-    /// until its parent calls wait. 
+
+    /// Exit the current process. Does not return.
+    /// An exited process remains in the zombie state
+    /// until its parent calls wait.
     pub fn exit(&mut self, status : usize) -> ! {
         let my_proc = unsafe {
             CPU_MANAGER.myproc().expect("Current cpu's process is none.")
         };
-        // close all open files. 
+        // close all open files.
         let pdata = unsafe{ &mut *my_proc.data.get() };
         let open_files = &mut pdata.open_files;
         // 遍历该进程打开的文件，夺取所有权，即将引用计数减一
+        // traversing the files opened by the process, taking ownership
         for index in 0..open_files.len() {
             if open_files[index].is_some() {
                 open_files[index].take();
@@ -220,16 +221,18 @@ impl ProcManager{
         pdata.cwd = None;
 
         let wait_guard = self.wait_lock.acquire();
-        // Give any children to init. 
+        // Give any children to init.
         self.reparent(my_proc);
-        // Parent might be sleeping in wait. 
+        // Parent might be sleeping in wait.
         // 唤醒父进程
         self.wake_up(pdata.parent.expect("Fail to find parent process") as usize);
 
         let mut proc_data = my_proc.meta.acquire();
         // 设置退出状态
+        // Set the exit code
         proc_data.xstate = status;
         // 设置运行状态
+        // Set the process state
         proc_data.set_state(ProcState::ZOMBIE);
 
         drop(wait_guard);
@@ -239,7 +242,7 @@ impl ProcManager{
         };
         unsafe {
             my_cpu.sched(
-                proc_data, 
+                proc_data,
                 &mut pdata.context as *mut Context
             );
         }
@@ -247,7 +250,7 @@ impl ProcManager{
         panic!("zombie exit!");
     }
 
-    /// Wait for a child process to exit and return its pid. 
+    /// Wait for a child process to exit and return its pid.
     /// 等待子进程退出并返回 pid
     pub fn wait(&mut self, addr: usize) -> Option<usize> {
         let pid;
@@ -257,7 +260,7 @@ impl ProcManager{
         let mut wait_guard = self.wait_lock.acquire();
         loop {
             let mut have_kids = false;
-            // Scan through table looking for exited children. 
+            // Scan through table looking for exited children.
             // 遍历所有进程是否为其他进程的子进程
             for index in 0..self.proc.len() {
                 let p = &mut self.proc[index];
@@ -267,15 +270,18 @@ impl ProcManager{
                 if let Some(parent) = pdata.parent {
                     if parent as *const _ == my_proc as *const _ {
                         // 确报子进程不会退出或者进行被调度出去
+                        // The process will not exit or be dispatched out
                         let proc_meta = p.meta.acquire();
                         have_kids = true;
-                        // make sure the child isn't still in exit or swtch. 
+                        // make sure the child isn't still in exit or swtch.
                         if proc_meta.state == ProcState::ZOMBIE {
-                            // Found one 
+                            // Found one
                             pid = proc_meta.pid;
                             let page_table = pdata.pagetable.as_mut().expect("Fail to get pagetable");
                             // 这里是要获取子进程退出的状态，当 addr 的值为 0 的时候为悬空指针，表示
                             // 不需要获取子进程退出的状态
+                            // Get the state to get the child process to check exit, and when the addr is worth 0, the suspended pointer is indicated
+                            // does not need to get the state of the child process exit
                             if addr != 0 && page_table.copy_out(addr, proc_meta.xstate as *const u8, size_of_val(&proc_meta.xstate)).is_err() {
                                 drop(proc_meta);
                                 drop(wait_guard);
@@ -291,32 +297,33 @@ impl ProcManager{
                 }
             }
             let my_proc_data = my_proc.meta.acquire();
-            // No point waiting if we don't have any children. 
+            // No point waiting if we don't have any children.
             if !have_kids || my_proc_data.killed {
                 drop(wait_guard);
                 drop(my_proc_data);
                 return None
             }
+            // Release the lock
             // 释放锁，否则会死锁
             drop(my_proc_data);
             // Wait for a child to exit.
             my_proc.sleep(
-                my_proc as *const _ as usize, 
+                my_proc as *const _ as usize,
                 wait_guard
             );
             wait_guard = self.wait_lock.acquire();
         }
     }
 
-    /// Kill the process with the given pid. 
-    /// The victim won't exit until it tries to return. 
+    /// Kill the process with the given pid.
+    /// The victim won't exit until it tries to return.
     /// to user space (user_trap)
     pub fn kill(&mut self, pid: usize) -> Result<usize, ()> {
         for proc in self.proc.iter_mut() {
             if proc.pid() == pid {
                 proc.set_killed(true);
                 if proc.state() == ProcState::SLEEPING {
-                    // Wake process from sleep. 
+                    // Wake process from sleep.
                     proc.set_state(ProcState::RUNNABLE);
                     return Ok(0)
                 }
@@ -325,8 +332,8 @@ impl ProcManager{
         Err(())
     }
 
-    /// Print a process listing to console. For debugging. 
-    /// Runs when user type ^P on console. 
+    /// Print a process listing to console. For debugging.
+    /// Runs when user type ^P on console.
     /// No lock to avoid wedging a stuck machine further
     pub fn proc_dump(&self) {
         for proc in self.proc.iter() {

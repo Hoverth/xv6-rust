@@ -451,8 +451,10 @@ impl Process{
 
     pub fn fork(&mut self) -> Option<&mut Self> {
         // 从表中获取未被分配的子进程
+        // Get unallocated subprocesses from the table
         if let Some(child_proc) = unsafe{ PROC_MANAGER.alloc_proc() } {
             // 从当前进程的页表拷贝到子进程中
+            // Copy from the page table of the current process to the sub-process
             let pdata = unsafe{ &mut *self.data.get() };
             let child_data = unsafe{ &mut *child_proc.data.get() };
             if unsafe{ pdata.pagetable.as_mut().unwrap().uvm_copy(
@@ -466,9 +468,11 @@ impl Process{
             let child_tf = unsafe{ &mut *child_data.trapframe };
             unsafe{ copy_nonoverlapping(ptf, child_tf, 1); }
             // fork 后子进程应当返回0
+            // Fork The post-process should return 0
             child_tf.a0 = 0;
 
             // 子进程拷贝父进程的文件和工作目录
+            // A child process copies the parent process's files and work directories
             child_data.open_files.clone_from(&pdata.open_files);
             child_data.cwd.clone_from(&pdata.cwd);
 

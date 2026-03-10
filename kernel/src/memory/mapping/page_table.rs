@@ -7,7 +7,7 @@ use crate::arch::riscv::{ sfence_vma, satp };
 use crate::memory::mapping::page_table_entry::{ PageTableEntry, PteFlags};
 use crate::arch::riscv::qemu::layout::{ PGSIZE, MAXVA, PGSHIFT, TRAMPOLINE, TRAPFRAME };
 use crate::memory::{
-    address::{ VirtualAddress, PhysicalAddress, Addr }, 
+    address::{ VirtualAddress, PhysicalAddress, Addr },
     kalloc::KERNEL_HEAP,
     RawPage,
     PageAllocator
@@ -65,7 +65,7 @@ impl PageTable{
         for i in 0..self.entries.len() {
             let pte = self.entries[i];
             if pte.is_valid() && !pte.is_leaf() {
-                // this PTE points to a lower-level page. 
+                // this PTE points to a lower-level page.
                 unsafe {
                     let child_pgt = &mut *(pte.as_pagetable());
                     child_pgt.free();
@@ -91,7 +91,7 @@ impl PageTable{
     ///   21..29 -- 9 bits of level-1 index.
     ///   12..20 -- 9 bits of level-0 index.
     ///    0..11 -- 12 bits of byte offset within the page.
-    /// 
+    ///
     /// Look up a virtual address, return the physical address,
     /// or 0 if not mapped.
     /// Can only be used to look up user pages.
@@ -108,16 +108,17 @@ impl PageTable{
             let pte = unsafe{ &mut (*page_table).entries[va.page_num(level)] };
             if pte.is_valid() {
                 page_table = pte.as_pagetable();
-    
+
             }else{
                return None
-            }            
+            }
         }
         let pte = unsafe{&mut (*page_table).entries[va.page_num(0)]};
         Some(pte)
     }
 
     /// 将虚拟地址翻译成物理地址或者直接映射
+    /// Translating a virtual address to a physical address or direct mapping
     fn translate_or_alloc(
         &mut self,
         va: VirtualAddress
@@ -131,9 +132,9 @@ impl PageTable{
             let pte = unsafe{ &mut (*pagetable).entries[va.page_num(level)] };
             if pte.is_valid() {
                 pagetable = pte.as_pagetable();
-    
+
             }else {
-                let zeroed_pgt: Box<PageTable> = unsafe{ 
+                let zeroed_pgt: Box<PageTable> = unsafe{
                     Box::new_zeroed().assume_init()
                 };
                 pagetable = Box::into_raw(zeroed_pgt);
@@ -148,7 +149,7 @@ impl PageTable{
     /// Can only be used to look up user pages.
     /// 通过给定的页表，将对应的虚拟地址转换成物理地址
     pub fn pgt_translate(
-        &mut self, 
+        &mut self,
         va: VirtualAddress
     ) -> Option<PhysicalAddress> {
         let addr = va.as_usize();
@@ -179,10 +180,10 @@ impl PageTable{
     /// allocate a needed page-table page.
     /// 将虚拟地址与物理地址建立映射，并写入MMU中
     pub unsafe fn map(
-        &mut self, 
-        mut va: VirtualAddress, 
-        mut pa: PhysicalAddress, 
-        size:usize, 
+        &mut self,
+        mut va: VirtualAddress,
+        mut pa: PhysicalAddress,
+        size:usize,
         perm:PteFlags
     ) -> bool {
         let mut last = VirtualAddress::new(va.as_usize() + size);
@@ -214,12 +215,12 @@ impl PageTable{
 
     /// add a mapping to the kernel page table.
     /// only used when booting
-    /// does not flush TLB or enable paging   
+    /// does not flush TLB or enable paging
     pub unsafe fn kernel_map(
-        &mut self, 
-        va:VirtualAddress, 
-        pa:PhysicalAddress, 
-        size:usize, 
+        &mut self,
+        va:VirtualAddress,
+        pa:PhysicalAddress,
+        size:usize,
         perm:PteFlags
     ) {
         // println!(
@@ -229,7 +230,7 @@ impl PageTable{
         //     size
         // );
         if !self.map(va, pa, size, perm){
-            panic!("内核虚拟地址映射失败");
+            panic!("Core virtual address mapping failure - 内核虚拟地址映射失败");
         }
     }
 
@@ -252,9 +253,9 @@ impl PageTable{
         write_bytes(mem, 0, PGSIZE);
 
         self.map(
-            VirtualAddress::new(0), 
-            PhysicalAddress::new(mem as usize), 
-            PGSIZE, 
+            VirtualAddress::new(0),
+            PhysicalAddress::new(mem as usize),
+            PGSIZE,
             PteFlags::W | PteFlags::R | PteFlags::X | PteFlags::U
         );
 
@@ -265,8 +266,8 @@ impl PageTable{
     /// Allocate PTEs and physical memory to grow process from old_size to
     /// new_size, which need not be page aligned.  Returns new size or 0 on error.
     pub unsafe fn uvm_alloc(
-        &mut self, 
-        mut old_size: usize, 
+        &mut self,
+        mut old_size: usize,
         new_size: usize
     ) -> Option<usize> {
         if new_size < old_size {
@@ -280,9 +281,9 @@ impl PageTable{
             write_bytes(memory as *mut u8, 0, PGSIZE);
 
             if !self.map(
-                VirtualAddress::new(cur_size), 
-                PhysicalAddress::new(memory), 
-                PGSIZE, 
+                VirtualAddress::new(cur_size),
+                PhysicalAddress::new(memory),
+                PGSIZE,
                 PteFlags::W | PteFlags::R | PteFlags::X | PteFlags::U
             ){
                 drop_in_place(memory as *mut RawPage);
@@ -317,19 +318,19 @@ impl PageTable{
     /// need to be less than old_size.  old_size can be larger than the actual
     /// process size.  Returns the new process size.
     pub fn uvm_dealloc(
-        &mut self, 
-        old_size:usize, 
+        &mut self,
+        old_size:usize,
         new_size:usize
     ) -> usize {
-        if new_size >= old_size { 
+        if new_size >= old_size {
             return old_size
         }
 
         if page_round_up(new_size) < page_round_up(old_size) {
             let pages_num = (page_round_up(old_size) - page_round_up(new_size)) / PGSIZE;
             self.uvm_unmap(
-                VirtualAddress::new(page_round_up(new_size)), 
-            pages_num, 
+                VirtualAddress::new(page_round_up(new_size)),
+            pages_num,
                 true
             );
         }
@@ -343,15 +344,15 @@ impl PageTable{
     /// page-aligned. The mappings must exist.
     /// Optionally free the physical memory.
     pub fn uvm_unmap(
-        &mut self, 
-        mut va: VirtualAddress, 
-        npages: usize, 
+        &mut self,
+        mut va: VirtualAddress,
+        npages: usize,
         free: bool
     ){
         if !va.is_page_aligned() {
             panic!("uvm_unmap: not aligned");
         }
-        
+
         for _ in 0..npages {
             match self.translate(va) {
                 Some(pte) => {
@@ -383,8 +384,8 @@ impl PageTable{
     /// returns 0 on success, -1 on failure.
     /// frees any allocated pages on failure.
     pub unsafe fn uvm_copy(
-        &mut self, 
-        child_pgt: &mut Self, 
+        &mut self,
+        child_pgt: &mut Self,
         size: usize
     ) -> Result<(), &'static str> {
         let mut va = VirtualAddress::new(0);
@@ -412,8 +413,8 @@ impl PageTable{
                         // calls to `std::mem::drop` with a value that implements `Copy` does nothing
                         // drop(allocated_pgt);
                         child_pgt.uvm_unmap(
-                            VirtualAddress::new(0), 
-                            va.as_usize() / PGSIZE, 
+                            VirtualAddress::new(0),
+                            va.as_usize() / PGSIZE,
                             true
                         );
                         return Err("uvmcopy: Fail.")
@@ -442,43 +443,55 @@ impl PageTable{
 
     /// Copy from kernel to user.
     /// Copy len bytes from src to virtual address dstva in a given page table.
-    /// Return Result<(), Err>. 
+    /// Return Result<(), Err>.
     pub fn copy_out(
-        &mut self, 
-        dst: usize, 
+        &mut self,
+        dst: usize,
         src: *const u8,
-        mut len: usize 
+        mut len: usize
     ) -> Result<(), &'static str> {
         // 从内核空间向用户空间拷贝数据
         // 拷贝的起始地址为 dst, 拷贝的结束地址为 dst + len
         // 首先将目标地址转成虚拟地址并进行页对齐
+        // Copy data from kernel space to user space
+        // The starting address of the copy is dst, and the end address of the copy is dst + len
+        // First, turn the destination address into a virtual address and align the page.
         let mut va = VirtualAddress::new(dst);
         va.pg_round_down();
 
         // println!("[Debug] va: 0x{:x}, dst: 0x{:x}", va.as_usize(), dst);
         // 计算第一次需要拷贝的字节数，需要进行页对齐
+        // Calculate the number of bytes that need to be copied for the first time, and need to align the pages
         let mut count = PGSIZE - (dst - va.as_usize());
         // 拷贝地址的偏移量，即已经拷贝了多少字节
+        // The offset of the copy address, that is, how many bytes have been copied
         let mut offset = 0;
         // 将目标地址的虚拟地址翻译成物理地址
+        // Translating the virtual address of the destination into a physical address
         let mut pa = self.pgt_translate(va).unwrap();
         // 计算需要拷贝的虚拟地址的位置
+        // Calculate the location of the virtual address that needs to be copied
         let mut dst_ptr = unsafe{
             pa.as_mut_ptr().offset((dst - va.as_usize()) as isize)
-        }; 
+        };
         loop {
             // 由于在 syscall 的时候将用户页表切换成了内核页表，
             // 因此在拷贝的时候需要将用户态的虚拟地址转换成物理地址，
             // 由于在内核中数据区是直接映射，因此在访问物理地址的时候
             // 经过 MMU 不会报错
+            // Since the user page table is switched to the kernel page table during syscall,
+            // Therefore, it is necessary to convert the virtual address of the user state into a physical address when copying.
+            // Since the data area is a direct mapping in the kernel, when accessing a physical address
+            // After MMU does not report error
             // println!("[Debug] count: {}, len: {}", count, len);
             if count > len {
                 // 如果页内剩余的容量大于生于要拷贝的容量，则将count替换成len
+                // If the remaining capacity in the page is greater than the capacity that is born in the to-copy, the count is replaced by len.
                 count = len;
                 unsafe{
                     copy(
-                        src.offset(offset as isize), 
-                        dst_ptr, 
+                        src.offset(offset as isize),
+                        dst_ptr,
                         count
                     );
                 }
@@ -486,13 +499,15 @@ impl PageTable{
             }else {
                 unsafe{
                     copy(
-                        src.offset(offset as isize), 
-                        dst_ptr, 
+                        src.offset(offset as isize),
+                        dst_ptr,
                         count
                     );
                 }
                 // 将页内剩余的容量全部拷贝进去，此时减少剩余容量,
                 // 增加偏移量,并重新计算物理地址, count, dst_ptr
+                // Copy all the remaining capacity in the page, and reduce the remaining capacity at this time.
+                // increase the offset and recalculate the physical address, count, dst_ptr
                 len -= count;
                 offset += count;
                 va.add_page();
@@ -501,16 +516,16 @@ impl PageTable{
                 dst_ptr = pa.as_mut_ptr();
             }
         }
-    }   
+    }
 
 
     /// Copy from user to kernel.
     /// Copy len bytes to dst from virtual address srcva in a given page table.
     /// Return Result<(), Err>
     pub fn copy_in(
-        &mut self, 
-        mut dst: *mut u8, 
-        src: usize, 
+        &mut self,
+        mut dst: *mut u8,
+        src: usize,
         mut len: usize
     ) -> Result<(), &'static str> {
         let mut va = VirtualAddress::new(src);
@@ -522,8 +537,8 @@ impl PageTable{
             let count = PGSIZE - (src - va.as_usize());
             if len < count {
                 mem_copy(
-                    dst as usize, 
-                    pa.as_usize() + ( src - va.as_usize() ), 
+                    dst as usize,
+                    pa.as_usize() + ( src - va.as_usize() ),
                     len
                 );
                 return Ok(())
@@ -540,34 +555,41 @@ impl PageTable{
         }
     }
 
-    /// Copy a null-trrminated string from user to kernel. 
-    /// Copy bytes to dst from virtual address src in a given table. 
-    /// until a '\0', or max. 
-    /// Return Result. 
+    /// Copy a null-trrminated string from user to kernel.
+    /// Copy bytes to dst from virtual address src in a given table.
+    /// until a '\0', or max.
+    /// Return Result.
     pub fn copy_in_str(
-        &mut self, 
+        &mut self,
         dst: *mut u8,
         src: usize,
         mut max: usize
     ) -> Result<(),&'static str> {
         // 将 src 作为虚拟地址
+        // Use src as a virtual address
         let mut va = VirtualAddress::new(src as usize);
         // 将虚拟地址进行页对齐
+        // Add the virtual address to the page.
         va.pg_round_down();
         loop {
             // 将用户态的虚拟地址转成物理地址
+            // Convert the virtual address of the user to a physical address
             let pa = self.pgt_translate(va).unwrap();
             // 计算该页所要读取的字节数
+            // Calculate the number of bytes to be read on this page
             let count = PGSIZE - (src - va.as_usize());
             let s = (pa.as_usize() + (src - va.as_usize())) as *const u8;
             if max < count {
                 // 所能读取的最大的字符数小于该页剩余字节
+                // The maximum number of bytes that can be read is less than the remaining bytes of the page.
                 for i in 0..max {
                     unsafe{
                         // 获取所要读取的指针
+                        // Get the pointer you want to read
                         let src_ptr = s.offset(i as isize);
                         // 获取所要读取的值
-                        let val = read(src_ptr); 
+                        // Get the value you want to read.
+                        let val = read(src_ptr);
                         if val == 0 { return Ok(()) }
                         let dst_ptr = dst.offset(i as isize);
                         write(dst_ptr, val);
@@ -579,7 +601,7 @@ impl PageTable{
             for i in 0..count {
                 unsafe {
                     let src_ptr = s.offset(i as isize);
-                    let src_val = read(src_ptr); 
+                    let src_val = read(src_ptr);
                     if src_val == 0 { return Ok(()) }
                     let dst_ptr = dst.offset(i as isize);
                     write(dst_ptr, src_val);
@@ -595,8 +617,8 @@ impl PageTable{
     /// physical memory it refers to.
     pub fn proc_free_pagetable(&mut self, size: usize) {
         self.uvm_unmap(
-            VirtualAddress::new(TRAMPOLINE ), 
-            1, 
+            VirtualAddress::new(TRAMPOLINE ),
+            1,
             false
         );
 
