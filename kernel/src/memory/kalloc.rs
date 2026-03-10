@@ -53,7 +53,7 @@ impl KernelHeap {
         extern "C" {
             fn end();
         }
-        let end = end as usize;
+        let end = end as *const () as usize;
         println!("KernelHeap: available memory: [{:#x}, {:#x})", end, PHYSTOP);
         self.init(end, PHYSTOP);
     }

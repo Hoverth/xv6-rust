@@ -138,7 +138,7 @@ impl ProcData {
 
         let kstack = self.kstack;
         self.context.write_zero();
-        self.context.write_ra(fork_ret as usize);
+        self.context.write_ra(fork_ret as *const () as usize);
         self.context.write_sp(kstack + PGSIZE);
     }
 
@@ -168,7 +168,7 @@ impl ProcData {
         // to/from user space, so not PTE_U. 
         if !page_table.map(
             VirtualAddress::new(TRAMPOLINE),
-            PhysicalAddress::new(trampoline as usize),
+            PhysicalAddress::new(trampoline as *const () as usize),
             PGSIZE,
             PteFlags::R | PteFlags::X
         ) {
@@ -199,7 +199,7 @@ impl ProcData {
         // process's kernel stack 
         tf.kernel_sp = self.kstack + PGSIZE * 4;
         // kernel user trap address
-        tf.kernel_trap = user_trap as usize;
+        tf.kernel_trap = user_trap as *const () as usize;
         // current process's cpu id.
         tf.kernel_hartid = unsafe {
             cpu::cpuid()
@@ -306,7 +306,7 @@ impl Process{
         unsafe{
             if !page_table.map(
             VirtualAddress::new(TRAMPOLINE), 
-            PhysicalAddress::new(trampoline as usize),
+            PhysicalAddress::new(trampoline as *const () as usize),
              PGSIZE, 
              PteFlags::R | PteFlags::X
             ) {
@@ -337,9 +337,10 @@ impl Process{
     /// including user pages.
     /// p.acquire() must be held.
     pub fn free_proc(&mut self) {
-        let mut pdata = self.data.get_mut();
+        let pdata = self.data.get_mut();
         if !pdata.trapframe.is_null() {
-            drop(pdata.trapframe as *mut RawPage);
+            // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+            // let _ = drop(pdata.trapframe as *mut RawPage);
             pdata.set_trapframe(0 as *mut Trapframe);
 
             if let Some(page_table) = pdata.pagetable.as_mut() {
@@ -368,7 +369,7 @@ impl Process{
     /// Grow or shrink user memory by n bytes. 
     /// Return true on success, false on failure. 
     pub fn grow_proc(&mut self, count: isize) -> Result<(), &'static str> {
-        let mut pdata = self.data.get_mut();
+        let pdata = self.data.get_mut();
         let mut size = pdata.size; 
         let page_table = pdata.pagetable.as_mut().unwrap();
         if count > 0 {

@@ -213,8 +213,9 @@ impl ProcManager{
         }
 
         LOG.begin_op();
-        let cwd = pdata.cwd.as_mut().expect("Fail to get inode");
-        drop(cwd);
+        //let cwd = pdata.cwd.as_mut().expect("Fail to get inode");
+        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+        // let _ = drop(cwd);
         LOG.end_op();
         pdata.cwd = None;
 

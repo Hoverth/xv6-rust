@@ -20,7 +20,7 @@ pub unsafe fn trap_init_hart() {
     extern "C" {
         fn kernelvec();
     }
-    stvec::write(kernelvec as usize);
+    stvec::write(kernelvec as *const () as usize);
 }
 
 
@@ -39,7 +39,7 @@ pub unsafe fn user_trap() {
     extern "C" {
         fn kernelvec();
     }
-    stvec::write(kernelvec as usize);
+    stvec::write(kernelvec as *const () as usize);
 
     let my_proc = CPU_MANAGER.myproc().unwrap();
     let pdata = my_proc.data.get_mut();
@@ -137,7 +137,7 @@ pub unsafe fn user_trap_ret() -> ! {
     sstatus::intr_off();
 
     // send syscalls, interrupts, and exceptions to trampoline.S
-    stvec::write(TRAMPOLINE + (uservec as usize - trampoline as usize));
+    stvec::write(TRAMPOLINE + (uservec as *const () as usize - trampoline as *const () as usize));
 
     // set up trapframe values that uservec will need when
     // the process next re-enters the kernel.
@@ -161,7 +161,7 @@ pub unsafe fn user_trap_ret() -> ! {
     // jump to trampoline.S at the top of memory, which
     // switches to the user page table, restores user registers,
     // and switches to user mode with sret. 
-    let userret_virt = TRAMPOLINE + (userret as usize - trampoline as usize);
+    let userret_virt = TRAMPOLINE + (userret as *const () as usize - trampoline as *const () as usize);
     let userret_virt: extern "C" fn(usize, usize) -> ! = 
     core::mem::transmute(userret_virt as usize);
     userret_virt(TRAPFRAME, satp);

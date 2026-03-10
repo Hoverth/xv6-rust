@@ -104,7 +104,7 @@ impl VFile {
                 match inode_guard.read(true, addr, self.offset, len as u32) {
                     Ok(size) => {
                         ret = size;
-                        let offset = unsafe { &mut *(&self.offset as *const _ as *mut u32)};
+                        let offset = unsafe { &mut *(self.offset as *mut u32)};
                         *offset += ret as u32;
                         drop(inode_guard);
                         Ok(ret)
@@ -187,7 +187,7 @@ impl VFile {
 
                     // update loop data
                     // self.offset += write_bytes as u32;
-                    let offset = unsafe{ &mut *(&self.offset as *const _ as *mut u32) };
+                    let offset = unsafe{ &mut *(self.offset as *mut u32) };
                     *offset += write_bytes as u32;
                     count += write_bytes;
                     
@@ -220,7 +220,7 @@ impl VFile {
             FileType::Device | FileType::Inode => {
                 let inode = self.inode.as_ref().unwrap();
                 
-                #[cfg(feature = "debug")]
+                #[cfg(feature = "kernel_debug")]
                 println!("[Kernel] stat: inode index: {}, dev: {}, inum: {}", inode.index, inode.dev, inode.inum);
 
                 let inode_guard = inode.lock();

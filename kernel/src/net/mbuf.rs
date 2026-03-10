@@ -83,8 +83,9 @@ impl MBuf {
 
     // Frees a packet buffer
     pub fn free(&mut self) {
-        let ptr = self as *mut Self;
-        drop(ptr);
+        // let ptr = self as *mut Self;
+        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+        // let _ = drop(ptr);
     }
 
     // Strips data from the end of the buffer and returns a pointer to it.

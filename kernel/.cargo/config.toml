@@ -2,6 +2,7 @@
 target = "riscv64gc-unknown-none-elf"
 
 # 使用我们的 kernel script 来进行链接
+# Use our kernel script to link
 [target.riscv64gc-unknown-none-elf]
 rustflags = [
     "-C", "link-arg=-Tsrc/linker/qemu.ld",

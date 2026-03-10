@@ -38,7 +38,7 @@ impl<T> SleepLock<T> {
 
 impl<T: ?Sized> SleepLock<T> {
     /// non-blocking, but might sleep if other p lock this sleeplock
-    pub fn lock(&self) -> SleepLockGuard<T> {
+    pub fn lock(&self) -> SleepLockGuard<'_, T> {
         let mut guard = self.lock.acquire();
         while self.locked.get() {
             unsafe {

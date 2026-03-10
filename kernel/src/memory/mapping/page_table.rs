@@ -75,7 +75,8 @@ impl PageTable{
                 panic!("pagetable free(): leaf not be removed");
             }
         }
-        drop(self);
+        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+        // drop(self);
     }
 
     /// Return the address of the PTE in page table pagetable
@@ -306,7 +307,8 @@ impl PageTable{
                 true
             );
         }
-        drop(self);
+        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+        // drop(self);
     }
 
 
@@ -407,7 +409,8 @@ impl PageTable{
                         PGSIZE,
                         flags
                     ) {
-                        drop(allocated_pgt);
+                        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+                        // drop(allocated_pgt);
                         child_pgt.uvm_unmap(
                             VirtualAddress::new(0), 
                             va.as_usize() / PGSIZE, 

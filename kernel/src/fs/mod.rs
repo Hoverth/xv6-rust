@@ -47,7 +47,7 @@ mod test {
 
     pub fn read_disk() {
         let block_cache = Bcache::new();
-        block_cache.init();
+        block_cache.binit();
         // read superblock
         block_cache.bread(0, 0);
     }

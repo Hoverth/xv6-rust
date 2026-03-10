@@ -1,23 +1,17 @@
 #![no_std]
 #![no_main]
 
-//#![feature(llvm_asm)]
-//#![feature(const_fn)]
-//#![feature(global_asm)]
-#![feature(ptr_internals)]
 #![allow(dead_code)]
-#![feature(panic_info_message)]
 #![allow(non_snake_case)]
 #![allow(const_item_mutation)]
 #![allow(unused_imports)]
-#![feature(const_option)]
-#![feature(const_fn_union)]
-#![feature(alloc_error_handler)]
-#![feature(new_uninit)]
-#![feature(fn_traits)]
-#![feature(const_fn_fn_ptr_basics)]
-#![feature(const_mut_refs)]
+#![allow(function_casts_as_integer)]
+#![allow(static_mut_refs)]
+#![allow(internal_features)]
 
+#![feature(ptr_internals)]
+#![feature(alloc_error_handler)]
+#![feature(fn_traits)]
 
 #[macro_use]
 extern crate bitflags;
@@ -65,7 +59,7 @@ use crate::process::*;
 use crate::fs::*;
 use crate::driver::virtio_disk::DISK;
 use crate::arch::riscv::{
-    mstatus, mepc, satp, medeleg, mideleg, sie, mhartid, tp, clint, 
+    mstatus, mepc, satp, medeleg, mideleg, sie, mhartid, tp, clint,
     mscratch, mtvec, mie, sstatus, pmp,
 };
 use crate::arch::riscv::qemu::param::NCPU;
@@ -81,7 +75,7 @@ pub unsafe fn start() -> !{
 
     // set M Exception Program Counter to main, for mret.
     // requires gcc -mcmodel=medany
-    mepc::write(rust_main as usize);
+    mepc::write(rust_main as *const () as usize);
 
     // disable paging for now.
     satp::write(0);
@@ -99,14 +93,14 @@ pub unsafe fn start() -> !{
     timer_init();
 
     // keep each CPU's hartid in its tp register, for cpuid().
-    let id:usize = mhartid::read(); 
+    let id:usize = mhartid::read();
     tp::write(id);
 
     // switch to supervisor mode and jump to main().
     core::arch::asm!("mret");
 
     loop{}
-    
+
 }
 
 /// set up to receive timer interrupts in machine mode,
@@ -136,7 +130,7 @@ unsafe fn timer_init(){
         fn timervec();
     }
 
-    mtvec::write(timervec as usize);
+    mtvec::write(timervec as *const () as usize);
 
     // enable machine-mode interrupts.
     mstatus::enable_interrupt();
@@ -151,7 +145,7 @@ unsafe fn timer_init(){
 pub unsafe extern "C" fn rust_main() {
     if cpu::cpuid() == 0 {
         console_init();
-        println!("{}",LOGO); 
+        println!("{}",LOGO);
         println!("xv6-rust kernel is booting!");
         KERNEL_HEAP.kinit(); // physical page allocator
         kvm_init(); // create kernel page table
@@ -174,7 +168,5 @@ pub unsafe extern "C" fn rust_main() {
         plic_init_hart(); // ask PLIC for device interrupts
     }
     CPU_MANAGER.scheduler();
-    
+
 }
-
-

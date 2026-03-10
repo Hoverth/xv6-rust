@@ -27,7 +27,7 @@ impl Syscall<'_> {
             Some(pid) => {
                 Ok(pid)
             },
-    
+
             None => {
                 Err(())
             }
@@ -40,26 +40,27 @@ impl Syscall<'_> {
         drop(pmeta);
         Ok(pid)
     }
-    
-    
+
+
     pub fn sys_sbrk(&mut self) -> SysResult {
         let size = self.arg(0);
         let pdata = unsafe{ &*self.process.data.get() };
         let addr = pdata.size;
-        drop(pdata);
+        // calls to `std::mem::drop` with a value that implements `Copy` does nothing
+        // let _ = drop(pdata);
         match self.process.grow_proc(size as isize) {
             Ok(()) => {
                 return Ok(addr)
             }
-    
+
             Err(err) => {
                 panic!("err: {:?}", err);
             }
         }
     }
-    
-    
-    
+
+
+
     pub fn sys_sleep(&self) -> SysResult {
         let time_span = self.arg(0);
 
@@ -73,7 +74,7 @@ impl Syscall<'_> {
                 CPU_MANAGER.myproc().expect("Fail to get my procsss")
             };
             if my_proc.killed() {
-                drop(ticks_guard);           
+                drop(ticks_guard);
                 return Err(())
             } else {
                 my_proc.sleep(0, ticks_guard);
@@ -86,15 +87,13 @@ impl Syscall<'_> {
         drop(ticks_guard);
         Ok(0)
     }
-    
-    
+
+
     pub fn sys_kill(&self) -> SysResult {
         let pid = self.arg(0);
         unsafe {
             PROC_MANAGER.kill(pid)
         }
     }
-    
+
 }
-
-

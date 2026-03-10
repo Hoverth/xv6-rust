@@ -100,15 +100,15 @@ unsafe fn kernel_map() {
     KERNEL_PAGETABLE.kernel_map(
         VirtualAddress::new(KERNEL_BASE), 
         PhysicalAddress::new(KERNEL_BASE), 
-        etext as usize - KERNEL_BASE, 
+        etext as *const () as usize - KERNEL_BASE, 
         PteFlags::R | PteFlags::X
     );
 
     // map kernel data and the physical RAM we'll make use of
     KERNEL_PAGETABLE.kernel_map(
-        VirtualAddress::new(etext as usize), 
-        PhysicalAddress::new(etext as usize), 
-        PHYSTOP - etext as usize, 
+        VirtualAddress::new(etext as *const () as usize), 
+        PhysicalAddress::new(etext as *const () as usize), 
+        PHYSTOP - etext as *const () as usize, 
         PteFlags::R | PteFlags::W
     );
 
@@ -116,7 +116,7 @@ unsafe fn kernel_map() {
     // the highest virtual address in the kernel
     KERNEL_PAGETABLE.kernel_map(
         VirtualAddress::new(TRAMPOLINE), 
-        PhysicalAddress::new(trampoline as usize), 
+        PhysicalAddress::new(trampoline as *const () as usize), 
         PGSIZE, 
         PteFlags::R | PteFlags::X
     );

@@ -220,7 +220,7 @@ impl Syscall<'_> {
         };
         let ret = unsafe {
             exec(path, &argv).map_err(
-                |_|(())
+                |_|() 
             )?
         };
     
