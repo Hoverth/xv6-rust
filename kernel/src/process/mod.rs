@@ -30,7 +30,7 @@ static INITCODE: [u8; 51] = [
     0x00, 0x00, 0x00,
 ];
 
-/// Exit the current process. Does not return. 
+/// Exit the current process. Does not return.
 /// An exited process remains in the zombie state
 /// until its parent calls wait()
 pub unsafe fn exit(status: i32) {
@@ -38,7 +38,7 @@ pub unsafe fn exit(status: i32) {
 
     // TODO: initproc
 
-    // Get extern data in current process. 
+    // Get extern data in current process.
     let pdata = my_proc.data.get_mut();
 
     // Close all open files
@@ -56,20 +56,20 @@ pub unsafe fn exit(status: i32) {
 
     let wait_guard = PROC_MANAGER.wait_lock.acquire();
     // TODO: Give any children to init
-    
-    // Parent might be sleeping in wait(). 
+
+    // Parent might be sleeping in wait().
     PROC_MANAGER.wake_up(pdata.parent.unwrap() as usize);
 
     let mut guard = my_proc.meta.acquire();
 
     guard.set_state(ProcState::ZOMBIE);
     guard.xstate = status as usize;
-    
+
     drop(guard);
 
     drop(wait_guard);
 
-    // Jump into scheduler, never to return. 
+    // Jump into scheduler, never to return.
     CPU_MANAGER.scheduler();
     panic!("zombine exit");
 
@@ -79,21 +79,24 @@ pub unsafe fn exit(status: i32) {
 
 /// A fork child's very first scheduling by scheduler()
 /// will switch to forkret.
-/// 
+///
 /// Need to be handled carefully, because CPU use ra to jump here
 unsafe fn fork_ret() -> ! {
     static mut FIRST: bool = true;
-    
+
     // Still holding p->lock from scheduler
     CPU_MANAGER.myproc().unwrap().meta.release();
-    
+
     if FIRST {
         // File system initialization
         FIRST = false;
         init(ROOTDEV);
+        /*let _ret = unsafe {
+            exec("/init", &[]).map_err(
+               |_|()
+            )
+        };*/
     }
-    // println!("user trap return");
+    println!("user trap return");
     user_trap_ret();
 }
-
-

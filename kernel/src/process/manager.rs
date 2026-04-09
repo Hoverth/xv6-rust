@@ -88,6 +88,7 @@ impl ProcManager{
         // allocate one user page and copy init's instructions
         // and data into it.
         let pdata = &mut *p.data.get();
+        println!("insert initcode data in to pagetable......");
         pdata.pagetable.as_mut().unwrap().uvm_init(
             &INITCODE,
         );
@@ -95,6 +96,7 @@ impl ProcManager{
         pdata.size = PGSIZE;
 
         // prepare for the very first "return" from kernel to user.
+        println!("prepare for the very first \"return\" from kernel to user.");
         let tf =  &mut *pdata.trapframe;
         tf.epc = 0; // user program counter
         tf.sp = 4 * PGSIZE; // user stack pointer
@@ -103,6 +105,7 @@ impl ProcManager{
         pdata.set_name(init_name);
         // Set init process's directory
         pdata.cwd = Some(ICACHE.namei(&ROOTIPATH).expect("cannot find root inode"));
+        println!("set init process's dir");
 
         let mut guard = p.meta.acquire();
         guard.set_state(ProcState::RUNNABLE);
@@ -110,6 +113,7 @@ impl ProcManager{
 
         // Set init process
         self.init_proc = p as *mut Process;
+        println!("init process set!");
     }
 
 

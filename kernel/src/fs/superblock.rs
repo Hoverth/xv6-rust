@@ -1,4 +1,5 @@
 //! Super block operations
+use core::fmt;
 
 use core::ptr;
 use core::mem::{self, MaybeUninit};
@@ -46,7 +47,6 @@ impl SuperBlock {
         self.initialized.store(true, Ordering::SeqCst);
         drop(buf);
 
-        #[cfg(feature = "verbose_init_info")]
         println!("super block data: {:?}", self.data.as_ptr().as_ref().unwrap());
     }
 
@@ -88,9 +88,9 @@ impl SuperBlock {
         self.read().ninodes
     }
 
-    /// Given an inode number. 
-    /// Return the blockno of the block this inode resides. 
-    /// Panic if the queryed inode out of range. 
+    /// Given an inode number.
+    /// Return the blockno of the block this inode resides.
+    /// Panic if the queryed inode out of range.
     pub fn locate_inode(&self, inum: u32) -> u32 {
         let sb = self.read();
         if inum >= sb.ninodes {
@@ -102,19 +102,18 @@ impl SuperBlock {
         blockno
     }
 
-    /// Given a block number in the disk. 
-    /// Returns the relevant block number of the (controlling) bitmap block. 
+    /// Given a block number in the disk.
+    /// Returns the relevant block number of the (controlling) bitmap block.
     pub fn bitmap_blockno(&self, blockno: u32) -> u32 {
         let sb = self.read();
         (blockno / BPB as u32) + sb.bmapstart
     }
 
-    
+
 }
 
 /// Raw super block describes the disk layout.
 #[repr(C)]
-#[derive(Debug)]
 struct RawSuperBlock {
     magic: u32,      // Must be FSMAGIC
     size: u32,       // Size of file system image (blocks)
@@ -124,4 +123,14 @@ struct RawSuperBlock {
     logstart: u32,   // Block number of first log block
     inodestart: u32, // Block number of first inode block
     bmapstart: u32,  // Block number of first free map block
+}
+
+impl fmt::Debug for RawSuperBlock {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "RawSuperBlock {{ magic: {:#X}, size: {}, nblocks: {}, ninodes: {}, nlog: {}, logstart: {}, inodestart: {}, bmapstart: {} }}",
+            self.magic, self.size, self.nblocks, self.ninodes, self.nlog, self.logstart, self.inodestart, self.bmapstart
+        )
+    }
 }

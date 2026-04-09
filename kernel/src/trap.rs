@@ -42,6 +42,7 @@ pub unsafe fn user_trap() {
     stvec::write(kernelvec as *const () as usize);
 
     let my_proc = CPU_MANAGER.myproc().unwrap();
+    println!("user_trap ({}, {}): sepc: {:?}, scause: {:?}", my_proc.name(), my_proc.pid(), sepc, scause.cause());
     let pdata = my_proc.data.get_mut();
 
     let tf = &mut *pdata.trapframe;
@@ -58,7 +59,7 @@ pub unsafe fn user_trap() {
             tf.update_epc();
 
             // An interrupt will change sstatus &c registers,
-            // so don't enable until done with those registers. 
+            // so don't enable until done with those registers.
             sstatus::intr_on();
             handle_syscall();
         },
@@ -83,7 +84,7 @@ pub unsafe fn user_trap() {
                 }
                 plic_complete(interrupt);
             }
-            
+
         },
 
         // Clock Interrupt
@@ -104,9 +105,9 @@ pub unsafe fn user_trap() {
         },
 
         _ => {
-            println!("usertrap: unexpected scacuse: {:?}\n pid: {}", scause.cause(), my_proc.pid());
-            println!("sepc: 0x{:x}, stval: 0x{:x}", sepc, stval::read());
-            my_proc.modify_kill(true);
+            println!("user_trap: unexpected scause: {:?}\n pid: {}\n name: {}", scause.cause(), my_proc.pid(), my_proc.name());
+            println!("line (sepc): 0x{:x}, address (stval): 0x{:x}", sepc, stval::read());
+            my_proc.modify_kill(true); // kill process
         }
 
     }
@@ -114,7 +115,7 @@ pub unsafe fn user_trap() {
     if my_proc.killed() {
         exit(-1);
     }
-    
+
     user_trap_ret();
 }
 
@@ -146,23 +147,23 @@ pub unsafe fn user_trap_ret() -> ! {
 
     // set up the registers that trampoline.S's sret will use
     // to get to user space.
-    // Set S Previous Privilege mode to User. 
+    // Set S Previous Privilege mode to User.
     let mut sstatus = sstatus::read();
     sstatus = sstatus::clear_spp(sstatus); // clear SPP to 0 for user mode
     sstatus = sstatus::user_intr_on(sstatus); // enable interrupts in user mode
     sstatus::write(sstatus);
 
-    // set S Exception Program Counter to the saved user pc. 
+    // set S Exception Program Counter to the saved user pc.
     sepc::write((*pdata.trapframe).epc);
-    
+
     // tell trampoline.S the user page table to switch to
     let satp = pdata.pagetable.as_ref().unwrap().as_satp();
 
     // jump to trampoline.S at the top of memory, which
     // switches to the user page table, restores user registers,
-    // and switches to user mode with sret. 
+    // and switches to user mode with sret.
     let userret_virt = TRAMPOLINE + (userret as *const () as usize - trampoline as *const () as usize);
-    let userret_virt: extern "C" fn(usize, usize) -> ! = 
+    let userret_virt: extern "C" fn(usize, usize) -> ! =
     core::mem::transmute(userret_virt as usize);
     userret_virt(TRAPFRAME, satp);
 }
@@ -199,11 +200,11 @@ pub unsafe fn kernel_trap(
         Trap::Exception(Exception::LoadFault) => panic!("Load Fault!"),
 
         Trap::Exception(Exception::LoadPageFault) => {
-            panic!("[Panic] Load Page Fault!\n stval: 0x{:x}\n sepc: 0x{:x}\n", stval, sepc);
+            panic!("[Panic] Load Page Fault!\n address (stval): 0x{:x}\n line (sepc): 0x{:x}\n", stval, sepc);
         },
 
         Trap::Exception(Exception::StorePageFault) => {
-            panic!("[Panic] Store Page Fault!\n stval: 0x{:x}\n sepc: 0x{:x}\n", stval, sepc);
+            panic!("[Panic] Store Page Fault!\n address (stval): 0x{:x}\n line (sepc): 0x{:x}\n", stval, sepc);
         },
 
         Trap::Exception(Exception::KernelEnvCall) => {
@@ -215,7 +216,7 @@ pub unsafe fn kernel_trap(
                         RESET_REASON_NO_REASON
                     );
                 },
-        
+
                 REBOOT => {
                     println!("\x1b[1;31mReboot!\x1b[0m");
                     system_reset(
@@ -223,7 +224,7 @@ pub unsafe fn kernel_trap(
                         RESET_REASON_NO_REASON
                     );
                 },
-        
+
                 _ => {
                     panic!("Unresolved Kernel Syscall!");
                 }
@@ -259,7 +260,7 @@ pub unsafe fn kernel_trap(
                 }
                 plic_complete(interrupt);
             }
-            
+
         },
 
         // Clock Interrupt
@@ -274,11 +275,11 @@ pub unsafe fn kernel_trap(
             // the SSIP bit in sip.
             sip::clear_ssip();
 
-            // give up the cpu. 
+            // give up the cpu.
             CPU_MANAGER.mycpu().try_yield_proc();
         }
 
-        _ => {       
+        _ => {
             panic!("Unresolved Trap!");
         }
     }

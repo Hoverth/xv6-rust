@@ -56,7 +56,7 @@ impl CPUManager{
             }
         }
     }
-    
+
     /// Per-CPU process scheduler.
     /// Each CPU calls scheduler() after setting itself up.
     /// Scheduler never returns.  It loops, doing:
@@ -76,7 +76,7 @@ impl CPUManager{
             match PROC_MANAGER.seek_runnable() {
                 Some(proc) => {
                     // Switch to chosen process. It is the process's job
-                    // to release it's lock and then reacquire it 
+                    // to release it's lock and then reacquire it
                     // before jumping back to us.
                     c.set_proc(NonNull::new(proc as *mut Process));
                     let mut pmeta = proc.meta.acquire();
@@ -88,8 +88,8 @@ impl CPUManager{
                     if c.get_context_mut().is_null() {
                         panic!("context switch back with no process reference.");
                     }
-                    // Process is done running for now. 
-                    // It should have changed it's process state before coming back. 
+                    // Process is done running for now.
+                    // It should have changed it's process state before coming back.
                     c.set_proc(None);
                     drop(pmeta);
                 }
@@ -141,10 +141,10 @@ impl CPU{
     /// there's no process.
     pub unsafe fn sched<'a>
     (
-        &mut self, 
-        guard: SpinlockGuard<'a, ProcMeta>, 
+        &mut self,
+        guard: SpinlockGuard<'a, ProcMeta>,
         ctx: *mut Context
-    ) 
+    )
     -> SpinlockGuard<'a, ProcMeta>
     {
         extern "C" {
@@ -159,8 +159,8 @@ impl CPU{
             println!("self noff is {}", self.noff);
             panic!("sched: cpu hold mutliple locks");
         }
-            
-        // proc is not running. 
+
+        // proc is not running.
         if guard.state == ProcState::RUNNING {
             panic!("sched: proc is running");
         }
@@ -174,12 +174,12 @@ impl CPU{
         // println!("[Kernel] switch");
         // println!("[Kernel] old_context: 0x{:x}, new_context: 0x{:x}", ctx as usize, &mut self.context as *mut Context as usize);
         switch(
-            ctx, 
+            ctx,
             &mut self.context as *mut Context
         );
         self.intena = intena;
         guard
-        
+
     }
 
     /// Yield the holding process if any and it's RUNNING.
