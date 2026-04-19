@@ -19,13 +19,11 @@ xmas-elf = "0.8.0"
 allocator = { path = "../allocator" }
 
 [features]
-default  = []
-kernel_debug = []
-verbose_init_info = []
+default  = ["verbose_kernel"]
+verbose_kernel = []
 
 [profile.dev]
 panic = "abort"
 
 [profile.release]
 panic = "abort"
-

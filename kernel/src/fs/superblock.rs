@@ -48,6 +48,7 @@ impl SuperBlock {
         drop(buf);
 
         println!("super block data: {:?}", self.data.as_ptr().as_ref().unwrap());
+        println!("TODO: print list of files can see here? \}"); //r
     }
 
     /// Read the info of super block.

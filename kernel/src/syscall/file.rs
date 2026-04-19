@@ -33,7 +33,7 @@ impl Syscall<'_> {
         Ok(new_fd)
     }
 
-    /// read file data by special vfile. 
+    /// read file data by special vfile.
     pub fn sys_read(&self) -> SysResult {
         let size: usize;
         // Get file
@@ -107,7 +107,7 @@ impl Syscall<'_> {
                     }
                 }
             },
-    
+
             _ => {
                 match ICACHE.namei(&path) {
                     Some(cur_inode) => {
@@ -142,15 +142,15 @@ impl Syscall<'_> {
                 file.writeable = true;
             }
         }
-    
+
         if open_mode.get_bit(11) && inode_guard.dinode.itype == InodeType::File {
             inode_guard.truncate(&inode);
         }
-    
+
         // Drop guard for immutable borrow
         drop(inode_guard);
         LOG.end_op();
-    
+
         file.inode = Some(inode);
         // 0x0 -> read only
         // 0x1 -> write only
@@ -169,9 +169,9 @@ impl Syscall<'_> {
             }
         }
         Ok(fd)
-    
+
     }
-    
+
     pub fn sys_exec(&self) -> SysResult {
         let mut path = [0u8;MAXPATH];
         let mut argv = [0 as *mut u8; MAXARG];
@@ -180,7 +180,7 @@ impl Syscall<'_> {
         self.copy_from_str(addr, &mut path, MAXPATH).unwrap();
         let user_argv = self.arg(1);
         let path = from_utf8(&path).unwrap();
-    
+
         let mut count = 0;
         loop {
             if count >= argv.len() {
@@ -193,8 +193,8 @@ impl Syscall<'_> {
             }
             let mut buf = [0u8;8];
             self.copy_form_addr(
-                user_argv + count * size_of::<usize>(), 
-                &mut buf, 
+                user_argv + count * size_of::<usize>(),
+                &mut buf,
                 8
             )?;
 
@@ -207,25 +207,25 @@ impl Syscall<'_> {
             argv[count] = mem;
             let buf = unsafe { from_raw_parts_mut(mem, PGSIZE) };
             self.copy_from_str(
-                user_arg, 
-                buf, 
+                user_arg,
+                buf,
                 PGSIZE
-            )?;   
+            )?;
             count += 1;
         }
-    
-        let argv = unsafe{ 
+
+        let argv = unsafe{
             from_raw_parts(
-                argv.as_ptr() as *const *const u8, 
+                argv.as_ptr() as *const *const u8,
                 MAXARG
-            ) 
+            )
         };
         let ret = unsafe {
             exec(path, &argv).map_err(
-                |_|() 
+                |_|()
             )?
         };
-    
+
         for i in 0..MAXARG {
             if argv[i] != 0 as *mut u8 {
                 unsafe{ drop_in_place(argv[i] as *mut RawPage) };
@@ -244,9 +244,9 @@ impl Syscall<'_> {
         let addr = self.arg(0);
         self.copy_from_str(addr, &mut path, MAXPATH)?;
         match ICACHE.create(
-            &path, 
-            InodeType::Device, 
-            major as i16, 
+            &path,
+            InodeType::Device,
+            major as i16,
             minor as i16
         ) {
             Ok(inode) => {
@@ -254,14 +254,14 @@ impl Syscall<'_> {
                 drop(inode);
                 Ok(0)
             },
-    
+
             Err(err) => {
                 println!("[Kernel] sys_mknod: err: {}", err);
                 LOG.end_op();
                 Err(())
             }
         }
-    
+
     }
 
     pub fn sys_close(&self) -> SysResult {
@@ -277,13 +277,13 @@ impl Syscall<'_> {
         let fd = self.arg(0);
         let stat = self.arg(1);
 
-        #[cfg(feature = "kernel_debug")]
+        #[cfg(feature = "verbose_kernel")]
         println!("[Kernel] sys_fstat: fd: {}, stat:0x{:x}", fd, stat);
 
         let pdata = unsafe{ &mut *self.process.data.get() };
         let file = pdata.open_files[fd].as_ref().unwrap();
 
-        #[cfg(feature = "kernel_debug")]
+        #[cfg(feature = "verbose_kernel")]
         println!("[Kernel] sys_fstat: File Type: {:?}", file.ftype);
 
         match file.stat(stat) {
@@ -332,7 +332,7 @@ impl Syscall<'_> {
     }
 
     pub fn sys_pipe(&self) -> SysResult {
-        // User use an array to represent two file. 
+        // User use an array to represent two file.
         // let mut fd_array: usize = 0;
         let mut rf: &mut VFile = &mut VFile::init();
         let mut wf: &mut VFile = &mut VFile::init();
@@ -344,7 +344,7 @@ impl Syscall<'_> {
             CPU_MANAGER.myproc().expect("Fail to get my process.")
         };
 
-        // Allocate file descriptor for r/w file. 
+        // Allocate file descriptor for r/w file.
         let rfd: usize;
         let wfd: usize;
         match p.fd_alloc(rf) {
@@ -358,7 +358,7 @@ impl Syscall<'_> {
                 return Err(())
             }
         }
-        
+
         match p.fd_alloc(wf) {
             Ok(fd) => {
                 wfd = fd;
@@ -384,8 +384,8 @@ impl Syscall<'_> {
         }
 
         if pgt.copy_out(
-            fd_array + size_of::<usize>(), 
-            wf as *const _ as *const u8, 
+            fd_array + size_of::<usize>(),
+            wf as *const _ as *const u8,
             size_of::<usize>()
         ).is_err() {
             open_files[rfd].take();
@@ -439,7 +439,7 @@ impl Syscall<'_> {
             panic!("sys_unlink: inods's nlink must be larger than 1.");
         }
 
-        if inode_guard.dinode.itype == InodeType::Directory && 
+        if inode_guard.dinode.itype == InodeType::Directory &&
             !inode_guard.is_dir_empty() {
                 drop(inode_guard);
                 drop(parent_guard);
@@ -507,7 +507,7 @@ impl Syscall<'_> {
             }
         }
         let mut parent_guard = parent.lock();
-        if parent_guard.dinode.itype != InodeType::Directory || 
+        if parent_guard.dinode.itype != InodeType::Directory ||
             parent_guard.dir_link(&name, inode.inum).is_ok() {
                 drop(parent_guard);
                 inode_guard.dinode.nlink -= 1;
@@ -515,7 +515,7 @@ impl Syscall<'_> {
                 LOG.end_op();
                 return Err(())
             }
-        
+
         inode_guard.update();
         drop(inode_guard);
         LOG.end_op();
@@ -542,9 +542,3 @@ impl Syscall<'_> {
     }
 
 }
-
-
-
-
-
-

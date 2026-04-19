@@ -41,7 +41,7 @@ pub enum FileInner {
     // Pipe(Pipe)
 }
 
-/// Virtual File, which can abstract struct to dispatch 
+/// Virtual File, which can abstract struct to dispatch
 /// syscall to specific file.
 #[derive(Clone, Debug)]
 pub struct VFile {
@@ -69,8 +69,8 @@ impl VFile {
     }
 
     pub fn read(
-        &self, 
-        addr: usize, 
+        &self,
+        addr: usize,
         len: usize
     ) -> Result<usize, &'static str> {
         let ret;
@@ -86,14 +86,14 @@ impl VFile {
             },
 
             FileType::Device => {
-                if self.major < 0 || 
-                self.major as usize >= NDEV || 
+                if self.major < 0 ||
+                self.major as usize >= NDEV ||
                 unsafe{ DEVICE_LIST.table[self.major as usize].read as usize == 0 }{
                     return Err("[Error] vfs: Fail to read device")
                 }
-                let read = unsafe { 
+                let read = unsafe {
                     DEVICE_LIST.table[self.major as usize].read()
-                };               
+                };
                 ret = read(true, addr, len).ok_or("Fail to read device")?;
                 return Ok(ret)
             },
@@ -121,18 +121,18 @@ impl VFile {
         }
     }
 
-    /// Write to file f. 
+    /// Write to file f.
     /// addr is a user virtual address.
     pub fn write(
-        &self, 
-        addr: usize, 
+        &self,
+        addr: usize,
         len: usize
     ) -> Result<usize, &'static str> {
-        let ret; 
+        let ret;
         if !self.writeable() {
             panic!("file can't be written")
         }
-        
+
         match self.ftype {
             FileType::Pipe => {
                 let pipe = unsafe{ &*self.pipe.unwrap() };
@@ -141,13 +141,13 @@ impl VFile {
             },
 
             FileType::Device => {
-                if self.major < 0 || 
-                self.major as usize >= NDEV || 
+                if self.major < 0 ||
+                self.major as usize >= NDEV ||
                 unsafe{ DEVICE_LIST.table[self.major as usize].write as usize == 0 } {
                     return Err("Fail to write to device")
                 }
 
-                let write = unsafe{ 
+                let write = unsafe{
                     DEVICE_LIST.table[self.major as usize].write()
                 };
                 ret = write(true, addr, len).ok_or("Fail to write device")?;
@@ -155,12 +155,12 @@ impl VFile {
             },
 
             FileType::Inode => {
-                // write a few blocks at a time to avoid exceeding 
+                // write a few blocks at a time to avoid exceeding
                 // the maxinum log transaction size, including
-                // inode, indirect block, allocation blocks, 
-                // and 2 blocks of slop for non-aligned writes. 
+                // inode, indirect block, allocation blocks,
+                // and 2 blocks of slop for non-aligned writes.
                 // this really belongs lower down, since inode write
-                // might be writing a device like console. 
+                // might be writing a device like console.
                 let max = ((MAXOPBLOCKS -1 -1 -2) / 2) * BSIZE;
                 let mut count  = 0;
                 while count < len {
@@ -174,9 +174,9 @@ impl VFile {
 
                     // return err when failt to write
                     inode_guard.write(
-                        true, 
-                        addr + count, 
-                        self.offset, 
+                        true,
+                        addr + count,
+                        self.offset,
                         write_bytes as u32
                     )?;
 
@@ -190,7 +190,7 @@ impl VFile {
                     let offset = unsafe{ &mut *(self.offset as *mut u32) };
                     *offset += write_bytes as u32;
                     count += write_bytes;
-                    
+
                 }
                 ret = count;
                 Ok(ret)
@@ -211,31 +211,31 @@ impl VFile {
         self.writeable
     }
 
-    /// Get metadata about file f. 
-    /// addr is a user virtual address, pointing to a struct stat. 
+    /// Get metadata about file f.
+    /// addr is a user virtual address, pointing to a struct stat.
     pub fn stat(&self, addr: usize) -> Result<(), &'static str> {
         let p = unsafe{ CPU_MANAGER.myproc().unwrap() };
         let mut stat: Stat = Stat::new();
         match self.ftype {
             FileType::Device | FileType::Inode => {
                 let inode = self.inode.as_ref().unwrap();
-                
-                #[cfg(feature = "kernel_debug")]
+
+                #[cfg(feature = "verbose_kernel")]
                 println!("[Kernel] stat: inode index: {}, dev: {}, inum: {}", inode.index, inode.dev, inode.inum);
 
                 let inode_guard = inode.lock();
                 inode_guard.stat(&mut stat);
                 drop(inode_guard);
-                
+
                 // println!(
-                //     "[Kernel] stat: dev: {}, inum: {}, nlink: {}, size: {}, type: {:?}", 
+                //     "[Kernel] stat: dev: {}, inum: {}, nlink: {}, size: {}, type: {:?}",
                 //     stat.dev, stat.inum, stat.nlink, stat.size, stat.itype
                 // );
                 let pdata = p.data.get_mut();
                 let page_table = pdata.pagetable.as_mut().unwrap();
                 page_table.copy_out(addr, (&stat) as *const Stat as *const u8, size_of::<Stat>())?;
                 Ok(())
-            },  
+            },
 
             _ => {
                 Err("")
@@ -243,8 +243,3 @@ impl VFile {
         }
     }
 }
-
-
-
-
-

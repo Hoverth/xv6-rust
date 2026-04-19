@@ -9,6 +9,20 @@
 #include "include/fcntl.h"
 #include "user.h"
 
+int
+main(void)
+{
+  // int pid, wpid;
+
+  if(open("console", O_RDWR) < 0){
+    mknod("console", CONSOLE, 0);
+    open("console", O_RDWR);
+  }
+  dup(0);  // stdout
+  dup(0);  // stderr
+  printf("init!");
+}
+/*
 char *argv[] = { "sh", 0 };
 
 int
@@ -52,3 +66,4 @@ main(void)
     }
   }
 }
+*/
